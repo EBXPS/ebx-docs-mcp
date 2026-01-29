@@ -61,44 +61,44 @@ try {
     packagesObj[key] = value;
   });
 
-  // Create basic task categorization
+  // Create basic task categorization (using FQNs for matching)
   const categoriesByTask: Record<string, string[]> = {
     'data access': [
-      'Adaptation',
-      'AdaptationTable',
-      'AdaptationHome',
-      'Request',
-      'RequestResult',
+      'com.onwbp.adaptation.Adaptation',
+      'com.onwbp.adaptation.AdaptationTable',
+      'com.onwbp.adaptation.AdaptationHome',
+      'com.onwbp.adaptation.Request',
+      'com.onwbp.adaptation.RequestResult',
     ],
     'schema': [
-      'SchemaNode',
-      'Path',
-      'SchemaExtensions',
-      'SchemaLocation',
+      'com.orchestranetworks.schema.SchemaNode',
+      'com.orchestranetworks.schema.Path',
+      'com.orchestranetworks.schema.SchemaExtensions',
+      'com.orchestranetworks.schema.SchemaLocation',
     ],
     'validation': [
-      'ValidationReport',
-      'ConstraintContext',
-      'ConstraintViolation',
-      'ValidationContext',
+      'com.orchestranetworks.instance.ValidationReport',
+      'com.orchestranetworks.schema.ConstraintContext',
+      'com.orchestranetworks.schema.ConstraintViolation',
+      'com.orchestranetworks.instance.ValidationContext',
     ],
     'triggers': [
-      'TableTrigger',
-      'InstanceTrigger',
-      'TriggerExecutionContext',
-      'BeforeCreateOccurrenceContext',
+      'com.orchestranetworks.schema.trigger.TableTrigger',
+      'com.orchestranetworks.schema.trigger.InstanceTrigger',
+      'com.orchestranetworks.schema.trigger.TriggerExecutionContext',
+      'com.orchestranetworks.schema.trigger.BeforeCreateOccurrenceContext',
     ],
     'ui': [
-      'UIForm',
-      'UIComponentWriter',
-      'UIFormPane',
-      'UIHttpManagerComponent',
+      'com.orchestranetworks.ui.UIForm',
+      'com.orchestranetworks.ui.UIComponentWriter',
+      'com.orchestranetworks.ui.UIFormPane',
+      'com.orchestranetworks.ui.UIHttpManagerComponent',
     ],
     'workflow': [
-      'ProcessInstance',
-      'UserTask',
-      'WorkItem',
-      'WorkflowEngine',
+      'com.orchestranetworks.workflow.ProcessInstance',
+      'com.orchestranetworks.workflow.UserTask',
+      'com.orchestranetworks.workflow.WorkItem',
+      'com.orchestranetworks.workflow.WorkflowEngine',
     ],
   };
 
