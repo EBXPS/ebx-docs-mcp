@@ -18,10 +18,16 @@
   },
   "devDependencies": {
     "@types/node": "^20.11.0",
+    "@types/turndown": "^5.0.6",
     "tsx": "^4.7.0",
     "typescript": "^5.3.3"
   },
-  "keywords": ["mcp", "ebx", "javadoc", "documentation"],
+  "keywords": [
+    "mcp",
+    "ebx",
+    "javadoc",
+    "documentation"
+  ],
   "author": "",
   "license": "MIT"
 }
