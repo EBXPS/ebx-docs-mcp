@@ -253,7 +253,7 @@ Returns the string value of the specified node...
 
 ## Implementation Phases
 
-**Status:** Phase 1 Complete ✅ | Phase 2 In Progress 🚧
+**Status:** Phase 1 Complete ✅ | Phase 2 Complete ✅ | Phase 3 Next 🎯
 
 ### Phase 1: Project Setup ✅ COMPLETE
 **Completed:** 2026-01-29
@@ -262,19 +262,23 @@ Returns the string value of the specified node...
 - Set up tsconfig.json for Node.js + ES modules
 - Create basic project structure
 
-**Files to create:**
+**Files created:**
 - `/Users/steve/claude/ebx-docs-mcp/package.json`
 - `/Users/steve/claude/ebx-docs-mcp/tsconfig.json`
 - `/Users/steve/claude/ebx-docs-mcp/src/index.ts`
 
-### Phase 2: Index Parser
-- Parse JavaScript search indices (type-search-index.js, member-search-index.js)
+### Phase 2: Index Parser ✅ COMPLETE
+**Completed:** 2026-01-29
+- Parse JavaScript search indices (type-search-index.js, member-search-index.js, package-search-index.js)
 - Extract all class names, packages, and method signatures
 - Build initial index structure
+- Generate data/index.json with 732 classes, 2494 methods, 57 packages
 
-**Files to create:**
+**Files created:**
 - `/Users/steve/claude/ebx-docs-mcp/src/parser/SearchIndexParser.ts`
 - `/Users/steve/claude/ebx-docs-mcp/src/indexer/types.ts`
+- `/Users/steve/claude/ebx-docs-mcp/src/build-index.ts` (updated)
+- `/Users/steve/claude/ebx-docs-mcp/data/index.json` (generated)
 
 ### Phase 3: HTML Documentation Parser
 - Implement Cheerio-based HTML parser
@@ -490,24 +494,35 @@ Returns the string value of the specified node...
   - Basic MCP server with 4 tool definitions
   - Directory structure created (parser/, indexer/, tools/, cache/)
   - Project builds successfully with `npm run build`
-  - Placeholder build script for index generation
 
-### 🚧 Next Priority: Phase 2 - Index Parser
-The most important next step is to implement the SearchIndexParser to extract class and method information from the existing javadoc search indices.
+- **Phase 2: Index Parser** - Successfully parsing javadoc search indices
+  - Created `src/indexer/types.ts` with all TypeScript interfaces
+  - Implemented `src/parser/SearchIndexParser.ts` to parse JS indices
+  - Updated `src/build-index.ts` to generate searchable index
+  - Generated `data/index.json` (4.0 MB) with:
+    - 732 classes indexed (1463 including simple name aliases)
+    - 2494 unique method names
+    - 57 packages
+    - Task categorization for common workflows
+  - Verified index structure with test script - all lookups working
+
+### 🎯 Next Priority: Phase 3 - HTML Documentation Parser
+Now that we have the basic index, the next step is to implement HTML parsing for full documentation details.
 
 **Critical files to create:**
-1. `src/indexer/types.ts` - Define TypeScript interfaces for all data structures
-2. `src/parser/SearchIndexParser.ts` - Parse type-search-index.js, member-search-index.js, package-search-index.js
-3. Update `src/build-index.ts` - Generate data/index.json at build time
+1. `src/parser/ClassDocParser.ts` - Parse individual class HTML files with Cheerio
+2. `src/cache/CacheManager.ts` - LRU cache for parsed documentation
+3. Update tool handlers in `src/index.ts` to use the index for basic searches
 
-**Why this is the foundation:**
-- The javadoc includes pre-built JavaScript search indices with ~900 classes and 5000+ methods
-- Parsing these provides instant inventory without parsing 1,669 HTML files
-- This enables implementation of search tools before HTML parsing
-- HTML parsing can be added later for full documentation details
+**Why this is important:**
+- The index provides class/method names and signatures
+- HTML parsing adds descriptions, parameters, return types, examples
+- This enables rich documentation in tool responses
+- Caching prevents re-parsing the same HTML files
 
 **Test verification:**
-After Phase 2, we should be able to:
-- Run `npm run build` and see actual index generation output
-- Have a populated `data/index.json` with all class names and basic metadata
-- Implement basic `search_ebx_class` functionality using the index
+After Phase 3, we should be able to:
+- Parse individual class HTML files on-demand
+- Extract full method documentation with parameters and descriptions
+- Cache parsed results for performance
+- Return rich markdown documentation from `get_ebx_class_doc` tool

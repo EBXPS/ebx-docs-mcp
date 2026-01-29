@@ -6,32 +6,129 @@
  * a pre-built index for fast server startup
  */
 
-console.log("Build index script - placeholder implementation");
-console.log("TODO: Implement index generation from javadoc HTML files");
-console.log("- Parse type-search-index.js for all classes");
-console.log("- Parse member-search-index.js for all methods/fields");
-console.log("- Parse package-search-index.js for all packages");
-console.log("- Generate data/index.json");
-
-// For now, create an empty index file
 import { writeFileSync, mkdirSync } from "fs";
-import { dirname } from "path";
+import { dirname, join } from "path";
 import { fileURLToPath } from "url";
+import { SearchIndexParser } from "./parser/SearchIndexParser.js";
+import { SerializableSearchIndex } from "./indexer/types.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-const dataDir = `${__dirname}/../data`;
+const dataDir = join(__dirname, '../data');
+const javadocPath = join(__dirname, '../ebx-core-javadoc');
+
+console.log("=== EBX Documentation Index Builder ===");
+console.log(`Javadoc path: ${javadocPath}`);
+console.log(`Output path: ${dataDir}`);
+
+// Create data directory if it doesn't exist
 mkdirSync(dataDir, { recursive: true });
 
-const emptyIndex = {
-  version: "1.0.0",
-  generatedAt: new Date().toISOString(),
-  classes: [],
-  packages: [],
-  methods: [],
-};
+try {
+  // Parse search indices
+  const parser = new SearchIndexParser(javadocPath);
+  const { types, members, packages } = parser.parseAll();
 
-writeFileSync(`${dataDir}/index.json`, JSON.stringify(emptyIndex, null, 2));
-console.log("Created empty index at data/index.json");
-console.log("Build complete!");
+  console.log(`\nParsing statistics:`);
+  console.log(`- Types: ${types.length}`);
+  console.log(`- Members: ${members.length}`);
+  console.log(`- Packages: ${packages.length}`);
+
+  // Build structured index
+  console.log('\nBuilding structured index...');
+  const classMap = parser.buildClassIndex(types);
+  const methodMap = parser.buildMethodIndex(members, classMap);
+  const packageMap = parser.buildPackageIndex(packages, classMap);
+
+  console.log(`- Unique classes: ${classMap.size}`);
+  console.log(`- Unique method names: ${methodMap.size}`);
+  console.log(`- Packages: ${packageMap.size}`);
+
+  // Convert Maps to plain objects for JSON serialization
+  const classesObj: Record<string, any> = {};
+  classMap.forEach((value, key) => {
+    classesObj[key] = value;
+  });
+
+  const methodsObj: Record<string, any> = {};
+  methodMap.forEach((value, key) => {
+    methodsObj[key] = value;
+  });
+
+  const packagesObj: Record<string, any> = {};
+  packageMap.forEach((value, key) => {
+    packagesObj[key] = value;
+  });
+
+  // Create basic task categorization
+  const categoriesByTask: Record<string, string[]> = {
+    'data access': [
+      'Adaptation',
+      'AdaptationTable',
+      'AdaptationHome',
+      'Request',
+      'RequestResult',
+    ],
+    'schema': [
+      'SchemaNode',
+      'Path',
+      'SchemaExtensions',
+      'SchemaLocation',
+    ],
+    'validation': [
+      'ValidationReport',
+      'ConstraintContext',
+      'ConstraintViolation',
+      'ValidationContext',
+    ],
+    'triggers': [
+      'TableTrigger',
+      'InstanceTrigger',
+      'TriggerExecutionContext',
+      'BeforeCreateOccurrenceContext',
+    ],
+    'ui': [
+      'UIForm',
+      'UIComponentWriter',
+      'UIFormPane',
+      'UIHttpManagerComponent',
+    ],
+    'workflow': [
+      'ProcessInstance',
+      'UserTask',
+      'WorkItem',
+      'WorkflowEngine',
+    ],
+  };
+
+  const index: SerializableSearchIndex = {
+    classes: classesObj,
+    methods: methodsObj,
+    packages: packagesObj,
+    categoriesByTask,
+  };
+
+  // Write to file
+  const outputPath = join(dataDir, 'index.json');
+  console.log(`\nWriting index to ${outputPath}...`);
+  writeFileSync(outputPath, JSON.stringify(index, null, 2));
+
+  const stats = {
+    fileSize: (JSON.stringify(index).length / 1024 / 1024).toFixed(2) + ' MB',
+    classes: classMap.size,
+    methods: methodMap.size,
+    packages: packageMap.size,
+  };
+
+  console.log('\n=== Build Complete! ===');
+  console.log(`Index file size: ${stats.fileSize}`);
+  console.log(`Total classes indexed: ${stats.classes}`);
+  console.log(`Total unique methods: ${stats.methods}`);
+  console.log(`Total packages: ${stats.packages}`);
+
+} catch (error) {
+  console.error('\n=== Build Failed! ===');
+  console.error(error);
+  process.exit(1);
+}
