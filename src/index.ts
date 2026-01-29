@@ -8,11 +8,23 @@ import {
   McpError,
   ErrorCode,
 } from "@modelcontextprotocol/sdk/types.js";
+import { DocumentationIndexer } from "./indexer/DocumentationIndexer.js";
+import * as path from "path";
+import { fileURLToPath } from "url";
 
 /**
  * EBX Documentation MCP Server
  * Provides tools for searching and retrieving TIBCO EBX v6.2.2 javadoc documentation
  */
+
+// Get the directory of the current module
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Initialize the documentation indexer
+const indexPath = path.join(__dirname, "..", "data", "index.json");
+const javadocRoot = path.join(__dirname, "..", "ebx-core-javadoc");
+const indexer = new DocumentationIndexer(indexPath, javadocRoot);
 
 const server = new Server(
   {
@@ -153,17 +165,37 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 });
 
 /**
- * Tool handlers - placeholder implementations
+ * Tool handlers
  */
 async function handleSearchClass(args: any) {
-  // TODO: Implement with SearchEngine
+  const { query, type = 'all', package: pkg, limit = 10 } = args;
+
+  if (!query) {
+    throw new McpError(ErrorCode.InvalidParams, "query parameter is required");
+  }
+
+  const results = indexer.searchClasses(query, {
+    type: type === 'all' ? undefined : type,
+    package: pkg,
+    limit,
+  });
+
   return {
     content: [
       {
         type: "text",
         text: JSON.stringify({
-          message: "search_ebx_class tool not yet implemented",
-          query: args.query,
+          results: results.map(r => ({
+            name: r.name,
+            fullyQualifiedName: r.fullyQualifiedName,
+            type: r.type,
+            package: r.package,
+            description: r.description,
+            keyMethods: r.keyMethods,
+            relevanceScore: r.relevanceScore,
+          })),
+          query,
+          count: results.length,
         }, null, 2),
       },
     ],
@@ -171,29 +203,118 @@ async function handleSearchClass(args: any) {
 }
 
 async function handleGetClassDoc(args: any) {
-  // TODO: Implement with ClassDocParser
+  const { className, includeInherited = false } = args;
+
+  if (!className) {
+    throw new McpError(ErrorCode.InvalidParams, "className parameter is required");
+  }
+
+  const doc = await indexer.getClassDoc(className, { includeInherited });
+
+  if (!doc) {
+    throw new McpError(
+      ErrorCode.InvalidParams,
+      `Class not found: ${className}`
+    );
+  }
+
+  // Format as markdown
+  let markdown = `# ${doc.simpleName}\n\n`;
+  markdown += `**Package:** ${doc.package}\n`;
+  markdown += `**Type:** ${doc.type}\n`;
+
+  if (doc.extends && doc.extends.length > 0) {
+    markdown += `**Extends:** ${doc.extends.join(', ')}\n`;
+  }
+
+  if (doc.implements && doc.implements.length > 0) {
+    markdown += `**Implements:** ${doc.implements.join(', ')}\n`;
+  }
+
+  if (doc.deprecated) {
+    markdown += `\n**⚠️ DEPRECATED**\n`;
+  }
+
+  if (doc.description) {
+    markdown += `\n## Description\n\n${doc.description}\n`;
+  }
+
+  if (doc.fields && doc.fields.length > 0) {
+    markdown += `\n## Fields\n\n`;
+    for (const field of doc.fields) {
+      markdown += `### ${field.name}: ${field.type}\n`;
+      if (field.description) {
+        markdown += `${field.description}\n`;
+      }
+      if (field.modifiers && field.modifiers.length > 0) {
+        markdown += `*Modifiers:* ${field.modifiers.join(', ')}\n`;
+      }
+      markdown += '\n';
+    }
+  }
+
+  if (doc.methods && doc.methods.length > 0) {
+    markdown += `\n## Methods\n\n`;
+    for (const method of doc.methods) {
+      markdown += `### ${method.signature}\n`;
+      if (method.description) {
+        markdown += `${method.description}\n\n`;
+      }
+      if (method.returnType) {
+        markdown += `**Returns:** ${method.returnType}\n\n`;
+      }
+      if (method.deprecated) {
+        markdown += `**⚠️ DEPRECATED**\n\n`;
+      }
+    }
+  }
+
+  if (doc.seeAlso && doc.seeAlso.length > 0) {
+    markdown += `\n## See Also\n\n`;
+    for (const ref of doc.seeAlso) {
+      markdown += `- ${ref}\n`;
+    }
+  }
+
   return {
     content: [
       {
         type: "text",
-        text: JSON.stringify({
-          message: "get_ebx_class_doc tool not yet implemented",
-          className: args.className,
-        }, null, 2),
+        text: markdown,
       },
     ],
   };
 }
 
 async function handleSearchMethod(args: any) {
-  // TODO: Implement with SearchEngine
+  const { methodName, className, returnType, limit = 10 } = args;
+
+  if (!methodName) {
+    throw new McpError(ErrorCode.InvalidParams, "methodName parameter is required");
+  }
+
+  const results = indexer.searchMethods(methodName, {
+    className,
+    returnType,
+    limit,
+  });
+
   return {
     content: [
       {
         type: "text",
         text: JSON.stringify({
-          message: "search_ebx_method tool not yet implemented",
-          methodName: args.methodName,
+          results: results.map(r => ({
+            method: r.method,
+            signature: r.signature,
+            className: r.className,
+            packageName: r.packageName,
+            returnType: r.returnType,
+            description: r.description,
+            relevanceScore: r.relevanceScore,
+          })),
+          methodName,
+          count: results.length,
         }, null, 2),
       },
     ],
@@ -201,14 +322,27 @@ async function handleSearchMethod(args: any) {
 }
 
 async function handleFindPackage(args: any) {
-  // TODO: Implement with DocumentationIndexer
+  const { task } = args;
+
+  if (!task) {
+    throw new McpError(ErrorCode.InvalidParams, "task parameter is required");
+  }
+
+  const results = indexer.findPackagesByTask(task);
+
   return {
     content: [
       {
         type: "text",
         text: JSON.stringify({
-          message: "find_ebx_package tool not yet implemented",
-          task: args.task,
+          relevantPackages: results.map(r => ({
+            name: r.name,
+            description: r.description,
+            keyClasses: r.keyClasses,
+            relevanceScore: r.relevanceScore,
+          })),
+          task,
+          count: results.length,
         }, null, 2),
       },
     ],
@@ -219,6 +353,11 @@ async function handleFindPackage(args: any) {
  * Start the server
  */
 async function main() {
+  // Initialize the documentation indexer
+  console.error("Loading EBX documentation index...");
+  await indexer.initialize();
+  console.error("Index loaded successfully");
+
   const transport = new StdioServerTransport();
   await server.connect(transport);
 
