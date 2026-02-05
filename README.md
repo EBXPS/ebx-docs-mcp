@@ -265,7 +265,7 @@ Discover packages by development task or domain.
 - **Search Operations:** <50ms (fuzzy search with Fuse.js)
 - **Full Documentation:** <100ms first time, <10ms cached
 - **Memory Usage:** ~100MB typical
-- **Index Size:** ~4MB (data/index.json)
+- **Index Size:** ~4MB (javadoc/javadoc-index.json)
 
 ## Development
 
@@ -299,8 +299,18 @@ npm run dev
 ebx-docs-mcp/
 ├── src/
 │   ├── index.ts                    # MCP server entry point
+│   ├── server/
+│   │   ├── createServer.ts         # MCP server factory
+│   │   ├── httpServer.ts           # HTTP server setup
+│   │   └── transportFactory.ts     # Transport layer configuration
+│   ├── tools/
+│   │   ├── index.ts                # Tool registry
+│   │   ├── searchClass.ts          # Class search tool
+│   │   ├── getClassDoc.ts          # Class documentation tool
+│   │   ├── searchMethod.ts         # Method search tool
+│   │   └── findPackage.ts          # Package discovery tool
 │   ├── parser/
-│   │   ├── SearchIndexParser.ts   # Parse JS search indices
+│   │   ├── SearchIndexParser.ts    # Parse JS search indices
 │   │   └── ClassDocParser.ts       # Parse HTML documentation
 │   ├── indexer/
 │   │   ├── DocumentationIndexer.ts # Main coordinator
@@ -308,11 +318,15 @@ ebx-docs-mcp/
 │   │   └── types.ts                # TypeScript interfaces
 │   ├── cache/
 │   │   └── CacheManager.ts         # LRU cache for docs
+│   ├── utils/
+│   │   ├── versionExtractor.ts     # Extract version from javadoc
+│   │   ├── zipExtractor.ts         # Extract zip files
+│   │   └── zipReader.ts            # Read files from zip
 │   ├── build-index.ts              # Index generation script
 │   └── test-*.ts                   # Test scripts
-├── data/
-│   └── index.json                  # Pre-built searchable index
-├── ebx-core-javadoc/               # EBX javadoc HTML files
+├── javadoc/
+│   ├── ebx-core-javadoc.zip        # EBX javadoc HTML files (zip)
+│   └── javadoc-index.json          # Pre-built searchable index (~4MB)
 ├── dist/                           # Compiled JavaScript
 └── package.json
 ```
@@ -334,12 +348,12 @@ The server organizes EBX APIs into task-based categories for easier discovery:
 
 1. Check that Node.js 18+ is installed: `node --version`
 2. Verify the build succeeded: `npm run build`
-3. Ensure `data/index.json` exists and is not empty
-4. Check that `ebx-core-javadoc/` directory exists with HTML files
+3. Ensure `javadoc/javadoc-index.json` exists and is not empty
+4. Check that `javadoc/ebx-core-javadoc.zip` exists with the javadoc files
 
 ### Empty Search Results
 
-1. Verify the index was built: `ls -lh data/index.json` (should be ~4MB)
+1. Verify the index was built: `ls -lh javadoc/javadoc-index.json` (should be ~4MB)
 2. Try rebuilding: `npm run build`
 3. Test with a known class: search for "Adaptation"
 
