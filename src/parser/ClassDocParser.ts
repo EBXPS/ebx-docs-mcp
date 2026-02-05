@@ -4,18 +4,17 @@
  */
 
 import * as cheerio from 'cheerio';
-import * as fs from 'fs/promises';
-import * as path from 'path';
 import TurndownService from 'turndown';
 import { ClassDocumentation, MethodDoc, FieldDoc, ParameterDoc } from '../indexer/types.js';
 import { classDocCache } from '../cache/CacheManager.js';
+import { readFileFromZip } from '../utils/zipReader.js';
 
 export class ClassDocParser {
-  private javadocRoot: string;
+  private zipPath: string;
   private turndown: TurndownService;
 
-  constructor(javadocRoot: string) {
-    this.javadocRoot = javadocRoot;
+  constructor(zipPath: string) {
+    this.zipPath = zipPath;
 
     // Configure Turndown for markdown conversion
     this.turndown = new TurndownService({
@@ -41,9 +40,14 @@ export class ClassDocParser {
       return cached;
     }
 
-    // Parse HTML file
-    const fullPath = path.join(this.javadocRoot, htmlPath);
-    const html = await fs.readFile(fullPath, 'utf-8');
+    // Read HTML file from zip archive
+    // The htmlPath is relative to the root of the zip (e.g., "com/example/Class.html")
+    const html = await readFileFromZip(this.zipPath, htmlPath);
+
+    if (!html) {
+      throw new Error(`Failed to read ${htmlPath} from ${this.zipPath}`);
+    }
+
     const $ = cheerio.load(html);
 
     // Extract class info

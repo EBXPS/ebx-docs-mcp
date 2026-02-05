@@ -6,7 +6,7 @@
  * a pre-built index for fast server startup
  */
 
-import { writeFileSync, mkdirSync } from "fs";
+import { writeFileSync, mkdirSync, rmSync } from "fs";
 import { dirname, join } from "path";
 import { fileURLToPath } from "url";
 import { SearchIndexParser } from "./parser/SearchIndexParser.js";
@@ -17,17 +17,17 @@ import { extractVersionFromIndexHtml } from "./utils/versionExtractor.js";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-const dataDir = join(__dirname, '../data');
-const zipPath = join(__dirname, '../ebx-core-javadoc.zip');
-const javadocPath = join(__dirname, '../ebx-core-javadoc');
+const javadocDir = join(__dirname, '../javadoc');
+const zipPath = join(javadocDir, 'ebx-core-javadoc.zip');
+const javadocPath = join(javadocDir, 'ebx-core-javadoc');
 
 console.log("=== EBX Documentation Index Builder ===");
 console.log(`Zip file: ${zipPath}`);
 console.log(`Javadoc path: ${javadocPath}`);
-console.log(`Output path: ${dataDir}`);
+console.log(`Output path: ${javadocDir}`);
 
-// Create data directory if it doesn't exist
-mkdirSync(dataDir, { recursive: true });
+// Create javadoc directory if it doesn't exist
+mkdirSync(javadocDir, { recursive: true });
 
 async function buildIndex() {
   try {
@@ -130,7 +130,7 @@ async function buildIndex() {
     };
 
     // Write to file
-    const outputPath = join(dataDir, 'index.json');
+    const outputPath = join(javadocDir, 'javadoc-index.json');
     console.log(`\nWriting index to ${outputPath}...`);
     writeFileSync(outputPath, JSON.stringify(index, null, 2));
 
@@ -146,6 +146,16 @@ async function buildIndex() {
     console.log(`Total classes indexed: ${stats.classes}`);
     console.log(`Total unique methods: ${stats.methods}`);
     console.log(`Total packages: ${stats.packages}`);
+
+    // Clean up extracted javadoc folder (no longer needed at runtime)
+    console.log('\nCleaning up extracted javadoc...');
+    try {
+      rmSync(javadocPath, { recursive: true, force: true });
+      console.log(`Removed: ${javadocPath}`);
+      console.log('(Runtime will read directly from zip file)');
+    } catch (cleanupError) {
+      console.warn(`Warning: Could not remove javadoc folder: ${cleanupError}`);
+    }
 
   } catch (error) {
     console.error('\n=== Build Failed! ===');

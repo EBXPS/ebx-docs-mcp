@@ -20,12 +20,12 @@ export class DocumentationIndexer {
   private searchEngine: SearchEngine | null = null;
   private classDocParser: ClassDocParser | null = null;
   private indexPath: string;
-  private javadocRoot: string;
+  private zipPath: string;
   private version: string | null = null;
 
-  constructor(indexPath: string, javadocRoot: string) {
+  constructor(indexPath: string, zipPath: string) {
     this.indexPath = indexPath;
-    this.javadocRoot = javadocRoot;
+    this.zipPath = zipPath;
   }
 
   /**
@@ -44,8 +44,8 @@ export class DocumentationIndexer {
     // Initialize search engine
     this.searchEngine = new SearchEngine(index);
 
-    // Initialize HTML parser (with cache)
-    this.classDocParser = new ClassDocParser(this.javadocRoot);
+    // Initialize HTML parser (with cache) - reads from zip
+    this.classDocParser = new ClassDocParser(this.zipPath);
 
     const endTime = Date.now();
     console.error(`Documentation index loaded in ${endTime - startTime}ms`);

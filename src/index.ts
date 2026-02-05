@@ -10,7 +10,6 @@ import {
   ErrorCode,
 } from "@modelcontextprotocol/sdk/types.js";
 import { DocumentationIndexer } from "./indexer/DocumentationIndexer.js";
-import { ensureExtracted } from "./utils/zipExtractor.js";
 import * as path from "path";
 import { fileURLToPath } from "url";
 import { createServer, IncomingMessage, ServerResponse } from "http";
@@ -25,10 +24,10 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Paths for documentation
-const indexPath = path.join(__dirname, "..", "data", "index.json");
-const zipPath = path.join(__dirname, "..", "ebx-core-javadoc.zip");
-const javadocRoot = path.join(__dirname, "..", "ebx-core-javadoc");
-const indexer = new DocumentationIndexer(indexPath, javadocRoot);
+const javadocDir = path.join(__dirname, "..", "javadoc");
+const indexPath = path.join(javadocDir, "javadoc-index.json");
+const zipPath = path.join(javadocDir, "ebx-core-javadoc.zip");
+const indexer = new DocumentationIndexer(indexPath, zipPath);
 
 const server = new Server(
   {
@@ -357,10 +356,6 @@ async function handleFindPackage(args: any) {
  * Start the server
  */
 async function main() {
-  // Extract javadoc from zip if needed
-  console.error("Ensuring javadoc is extracted...");
-  await ensureExtracted(zipPath, javadocRoot, { verbose: false });
-
   // Initialize the documentation indexer
   console.error("Loading EBX documentation index...");
   await indexer.initialize();
