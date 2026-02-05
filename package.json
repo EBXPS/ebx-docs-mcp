@@ -1,7 +1,7 @@
 {
   "name": "ebx-docs-mcp",
   "version": "1.0.0",
-  "description": "MCP server for TIBCO EBX v6.2.2 javadoc documentation",
+  "description": "MCP server for TIBCO EBX javadoc",
   "type": "module",
   "main": "dist/index.js",
   "scripts": {
@@ -28,10 +28,11 @@
   },
   "keywords": [
     "mcp",
+    "tibco",
     "ebx",
     "javadoc",
     "documentation"
   ],
-  "author": "",
+  "author": "Steve Higgins",
   "license": "MIT"
 }
