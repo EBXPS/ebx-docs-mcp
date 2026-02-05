@@ -1,11 +1,9 @@
 #!/usr/bin/env node
 
-import { Server } from "@modelcontextprotocol/sdk/server/index.js";
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import {
-  CallToolRequestSchema,
-  ListToolsRequestSchema,
   McpError,
   ErrorCode,
 } from "@modelcontextprotocol/sdk/types.js";
@@ -30,7 +28,7 @@ const indexPath = path.join(javadocDir, "javadoc-index.json");
 const zipPath = path.join(javadocDir, "ebx-core-javadoc.zip");
 const indexer = new DocumentationIndexer(indexPath, zipPath);
 
-const server = new Server(
+const server = new McpServer(
   {
     name: "ebx-docs-mcp",
     version: "6.2.2",
@@ -43,130 +41,116 @@ const server = new Server(
 );
 
 /**
- * List available tools
+ * Register tools with McpServer
  */
-server.setRequestHandler(ListToolsRequestSchema, async () => {
-  return {
-    tools: [
-      {
-        name: "search_ebx_class",
-        description: "Search for EBX classes, interfaces, or enums by name or description. Returns matching classes with brief descriptions and key methods.",
-        inputSchema: {
-          type: "object",
-          properties: {
-            query: {
-              type: "string",
-              description: "Class name or description to search for",
-            },
-            type: {
-              type: "string",
-              enum: ["class", "interface", "enum", "all"],
-              description: "Filter by type (default: all)",
-            },
-            package: {
-              type: "string",
-              description: "Optional package name filter (e.g., 'com.onwbp.adaptation')",
-            },
-            limit: {
-              type: "number",
-              description: "Maximum number of results (default: 10)",
-            },
-          },
-          required: ["query"],
+server.registerTool(
+  "search_ebx_class",
+  {
+    description: "Search for EBX classes, interfaces, or enums by name or description. Returns matching classes with brief descriptions and key methods.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        query: {
+          type: "string",
+          description: "Class name or description to search for",
+        },
+        type: {
+          type: "string",
+          enum: ["class", "interface", "enum", "all"],
+          description: "Filter by type (default: all)",
+        },
+        package: {
+          type: "string",
+          description: "Optional package name filter (e.g., 'com.onwbp.adaptation')",
+        },
+        limit: {
+          type: "number",
+          description: "Maximum number of results (default: 10)",
         },
       },
-      {
-        name: "get_ebx_class_doc",
-        description: "Get complete documentation for a specific EBX class. Returns detailed markdown documentation including methods, fields, inheritance, and examples.",
-        inputSchema: {
-          type: "object",
-          properties: {
-            className: {
-              type: "string",
-              description: "Fully qualified class name or simple name (e.g., 'Adaptation' or 'com.onwbp.adaptation.Adaptation')",
-            },
-            includeInherited: {
-              type: "boolean",
-              description: "Include inherited methods and fields (default: false)",
-            },
-          },
-          required: ["className"],
-        },
-      },
-      {
-        name: "search_ebx_method",
-        description: "Search for methods across all EBX classes. Returns methods matching the search criteria with their signatures and containing classes.",
-        inputSchema: {
-          type: "object",
-          properties: {
-            methodName: {
-              type: "string",
-              description: "Method name to search for",
-            },
-            className: {
-              type: "string",
-              description: "Optional class name filter",
-            },
-            returnType: {
-              type: "string",
-              description: "Optional return type filter",
-            },
-            limit: {
-              type: "number",
-              description: "Maximum number of results (default: 10)",
-            },
-          },
-          required: ["methodName"],
-        },
-      },
-      {
-        name: "find_ebx_package",
-        description: "Find EBX packages by task or domain (e.g., 'data access', 'UI forms', 'validation'). Returns relevant packages with key classes and common use cases.",
-        inputSchema: {
-          type: "object",
-          properties: {
-            task: {
-              type: "string",
-              description: "Task or domain description (e.g., 'data access', 'UI forms', 'validation', 'triggers')",
-            },
-          },
-          required: ["task"],
-        },
-      },
-    ],
-  };
-});
-
-/**
- * Handle tool calls
- */
-server.setRequestHandler(CallToolRequestSchema, async (request) => {
-  const { name, arguments: args } = request.params;
-
-  try {
-    switch (name) {
-      case "search_ebx_class":
-        return await handleSearchClass(args);
-      case "get_ebx_class_doc":
-        return await handleGetClassDoc(args);
-      case "search_ebx_method":
-        return await handleSearchMethod(args);
-      case "find_ebx_package":
-        return await handleFindPackage(args);
-      default:
-        throw new McpError(
-          ErrorCode.MethodNotFound,
-          `Unknown tool: ${name}`
-        );
-    }
-  } catch (error) {
-    if (error instanceof McpError) throw error;
-    throw new McpError(
-      ErrorCode.InternalError,
-      `Error executing ${name}: ${error instanceof Error ? error.message : String(error)}`
-    );
+      required: ["query"],
+    } as any,
+  },
+  async (args: any) => {
+    return await handleSearchClass(args);
   }
-});
+);
+
+server.registerTool(
+  "get_ebx_class_doc",
+  {
+    description: "Get complete documentation for a specific EBX class. Returns detailed markdown documentation including methods, fields, inheritance, and examples.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        className: {
+          type: "string",
+          description: "Fully qualified class name or simple name (e.g., 'Adaptation' or 'com.onwbp.adaptation.Adaptation')",
+        },
+        includeInherited: {
+          type: "boolean",
+          description: "Include inherited methods and fields (default: false)",
+        },
+      },
+      required: ["className"],
+    } as any,
+  },
+  async (args: any) => {
+    return await handleGetClassDoc(args);
+  }
+);
+
+server.registerTool(
+  "search_ebx_method",
+  {
+    description: "Search for methods across all EBX classes. Returns methods matching the search criteria with their signatures and containing classes.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        methodName: {
+          type: "string",
+          description: "Method name to search for",
+        },
+        className: {
+          type: "string",
+          description: "Optional class name filter",
+        },
+        returnType: {
+          type: "string",
+          description: "Optional return type filter",
+        },
+        limit: {
+          type: "number",
+          description: "Maximum number of results (default: 10)",
+        },
+      },
+      required: ["methodName"],
+    } as any,
+  },
+  async (args: any) => {
+    return await handleSearchMethod(args);
+  }
+);
+
+server.registerTool(
+  "find_ebx_package",
+  {
+    description: "Find EBX packages by task or domain (e.g., 'data access', 'UI forms', 'validation'). Returns relevant packages with key classes and common use cases.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        task: {
+          type: "string",
+          description: "Task or domain description (e.g., 'data access', 'UI forms', 'validation', 'triggers')",
+        },
+      },
+      required: ["task"],
+    } as any,
+  },
+  async (args: any) => {
+    return await handleFindPackage(args);
+  }
+);
 
 /**
  * Tool handlers
@@ -187,7 +171,7 @@ async function handleSearchClass(args: any) {
   return {
     content: [
       {
-        type: "text",
+        type: "text" as const,
         text: JSON.stringify({
           results: results.map(r => ({
             name: r.name,
@@ -283,7 +267,7 @@ async function handleGetClassDoc(args: any) {
   return {
     content: [
       {
-        type: "text",
+        type: "text" as const,
         text: markdown,
       },
     ],
@@ -306,7 +290,7 @@ async function handleSearchMethod(args: any) {
   return {
     content: [
       {
-        type: "text",
+        type: "text" as const,
         text: JSON.stringify({
           results: results.map(r => ({
             method: r.method,
@@ -337,7 +321,7 @@ async function handleFindPackage(args: any) {
   return {
     content: [
       {
-        type: "text",
+        type: "text" as const,
         text: JSON.stringify({
           relevantPackages: results.map(r => ({
             name: r.name,
