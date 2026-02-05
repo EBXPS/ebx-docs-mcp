@@ -29,7 +29,7 @@ const indexer = new DocumentationIndexer(indexPath, javadocRoot);
 const server = new Server(
   {
     name: "ebx-docs-mcp",
-    version: "1.0.0",
+    version: "6.2.2",
   },
   {
     capabilities: {
