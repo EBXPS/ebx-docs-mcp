@@ -2,7 +2,7 @@
 
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
+import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
@@ -13,6 +13,7 @@ import { DocumentationIndexer } from "./indexer/DocumentationIndexer.js";
 import * as path from "path";
 import { fileURLToPath } from "url";
 import { createServer, IncomingMessage, ServerResponse } from "http";
+import { randomUUID } from "crypto";
 
 /**
  * EBX Documentation MCP Server
@@ -373,19 +374,24 @@ async function main() {
     return;
   }
 
-  // HTTP/SSE mode
-  console.log("Starting in HTTP mode...");
+  // HTTP/Streamable mode
+  console.log("Starting in HTTP mode with Streamable transport...");
   const PORT = process.env.PORT ? parseInt(process.env.PORT) : 8000;
 
-  // Store active SSE transport
-  let activeTransport: SSEServerTransport | null = null;
+  // Create single transport instance
+  const transport = new StreamableHTTPServerTransport({
+    sessionIdGenerator: () => randomUUID(),
+  });
+
+  // Connect server to transport
+  await server.connect(transport);
 
   // Create HTTP server
   const httpServer = createServer(async (req: IncomingMessage, res: ServerResponse) => {
     // Set CORS headers
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Mcp-Session-Id');
 
     // Handle OPTIONS preflight
     if (req.method === 'OPTIONS') {
@@ -398,67 +404,59 @@ async function main() {
     if (req.url === '/health') {
       res.writeHead(200, { 'Content-Type': 'application/json' });
       const version = indexer.getVersion() || 'unknown';
-      res.end(JSON.stringify({ status: 'ok', version }));
+      res.end(JSON.stringify({ status: 'ok', version, transport: 'streamable-http' }));
       return;
     }
 
-    // SSE endpoint for MCP
-    if (req.url === '/sse') {
-      console.log('New SSE connection established');
+    // Unified MCP endpoint
+    if (req.url === '/mcp') {
+      try {
+        console.log(`${req.method} request to /mcp`);
 
-      // Create new transport and connect
-      activeTransport = new SSEServerTransport('/message', res);
-      await server.connect(activeTransport);
-
-      // Handle client disconnect
-      req.on('close', () => {
-        console.log('SSE connection closed');
-        activeTransport = null;
-      });
-
-      return;
-    }
-
-    // Handle POST to /message endpoint - route to active transport
-    if (req.url === '/message' && req.method === 'POST') {
-      if (!activeTransport) {
-        res.writeHead(503, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: 'No active SSE connection' }));
-        return;
-      }
-
-      let body = '';
-      req.on('data', (chunk) => {
-        body += chunk.toString();
-      });
-
-      req.on('end', async () => {
-        try {
-          console.log('Received message:', body);
-
-          // The SSEServerTransport should handle this internally
-          // For now, acknowledge receipt
-          res.writeHead(202, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ status: 'accepted' }));
-        } catch (error) {
-          console.error('Error handling message:', error);
-          res.writeHead(500, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ error: 'Internal server error' }));
+        // Read request body for POST requests
+        let body: any = undefined;
+        if (req.method === 'POST') {
+          body = await new Promise((resolve, reject) => {
+            let data = '';
+            req.on('data', (chunk) => {
+              data += chunk.toString();
+            });
+            req.on('end', () => {
+              try {
+                resolve(JSON.parse(data));
+              } catch (e) {
+                resolve(data);
+              }
+            });
+            req.on('error', reject);
+          });
         }
-      });
 
+        // Handle the request through the transport
+        await transport.handleRequest(req, res, body);
+      } catch (error) {
+        console.error('Error handling MCP request:', error);
+        if (!res.headersSent) {
+          res.writeHead(500, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({
+            error: 'Internal server error',
+            message: error instanceof Error ? error.message : String(error)
+          }));
+        }
+      }
       return;
     }
 
-    // Default response
+    // Default 404 response
     res.writeHead(404, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: 'Not found' }));
   });
 
   httpServer.listen(PORT, () => {
     console.log(`EBX Documentation MCP Server running on http://localhost:${PORT}`);
-    console.log(`SSE endpoint: http://localhost:${PORT}/sse`);
+    console.log(`MCP endpoint: http://localhost:${PORT}/mcp`);
     console.log(`Health check: http://localhost:${PORT}/health`);
+    console.log(`Transport: Streamable HTTP`);
   });
 }
 
