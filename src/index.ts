@@ -28,22 +28,14 @@ const indexPath = path.join(javadocDir, "javadoc-index.json");
 const zipPath = path.join(javadocDir, "ebx-core-javadoc.zip");
 const indexer = new DocumentationIndexer(indexPath, zipPath);
 
-const server = new McpServer(
-  {
-    name: "ebx-docs-mcp",
-    version: "6.2.2",
-  },
-  {
-    capabilities: {
-      tools: {},
-    },
-  }
-);
+// Server will be created in main() after indexer initialization
+let server: McpServer;
 
 /**
- * Register tools with McpServer
+ * Register all tools on the server
  */
-server.registerTool(
+function registerTools(srv: McpServer) {
+srv.registerTool(
   "search_ebx_class",
   {
     description: "Search for EBX classes, interfaces, or enums by name or description. Returns matching classes with brief descriptions and key methods.",
@@ -151,6 +143,7 @@ server.registerTool(
     return await handleFindPackage(args);
   }
 );
+}
 
 /**
  * Tool handlers
@@ -345,6 +338,23 @@ async function main() {
   console.error("Loading EBX documentation index...");
   await indexer.initialize();
   console.error("Index loaded successfully");
+
+  // Create server with version from index
+  const version = indexer.getVersion() || "unknown";
+  server = new McpServer(
+    {
+      name: "ebx-docs-mcp",
+      version: version,
+    },
+    {
+      capabilities: {
+        tools: {},
+      },
+    }
+  );
+
+  // Register all tools
+  registerTools(server);
 
   // Check if HTTP mode is requested
   const useHttp = process.argv.includes('--http') || process.env.MCP_TRANSPORT === 'http';
