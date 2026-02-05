@@ -36,7 +36,7 @@ npm install
 npm run build
 ```
 
-This will compile TypeScript and generate `data/index.json` (~4MB) with all searchable documentation metadata.
+This will compile TypeScript and build/rebuild `javadoc/javadoc-index.json` (~4MB) with all searchable documentation metadata.
 
 ## Configuration
 
