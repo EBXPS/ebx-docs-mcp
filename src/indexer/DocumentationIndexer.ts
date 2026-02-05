@@ -21,6 +21,7 @@ export class DocumentationIndexer {
   private classDocParser: ClassDocParser | null = null;
   private indexPath: string;
   private javadocRoot: string;
+  private version: string | null = null;
 
   constructor(indexPath: string, javadocRoot: string) {
     this.indexPath = indexPath;
@@ -37,6 +38,9 @@ export class DocumentationIndexer {
     const indexData = await readFile(this.indexPath, 'utf-8');
     const index: SerializableSearchIndex = JSON.parse(indexData);
 
+    // Store version if available
+    this.version = index.version || null;
+
     // Initialize search engine
     this.searchEngine = new SearchEngine(index);
 
@@ -45,6 +49,9 @@ export class DocumentationIndexer {
 
     const endTime = Date.now();
     console.error(`Documentation index loaded in ${endTime - startTime}ms`);
+    if (this.version) {
+      console.error(`EBX Version: ${this.version}`);
+    }
     console.error(`Index stats:`, this.searchEngine.getStats());
   }
 
@@ -137,5 +144,12 @@ export class DocumentationIndexer {
   getStats() {
     this.ensureInitialized();
     return this.searchEngine!.getStats();
+  }
+
+  /**
+   * Get the EBX version from the documentation
+   */
+  getVersion(): string | null {
+    return this.version;
   }
 }

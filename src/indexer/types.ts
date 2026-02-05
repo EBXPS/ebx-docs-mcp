@@ -111,6 +111,7 @@ export interface PackageSearchEntry {
  * Serializable version of SearchIndex for JSON storage
  */
 export interface SerializableSearchIndex {
+  version?: string;
   classes: Record<string, ClassDocumentation>;
   methods: Record<string, MethodSearchEntry[]>;
   packages: Record<string, PackageDocumentation>;

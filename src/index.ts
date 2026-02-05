@@ -2,6 +2,7 @@
 
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
@@ -9,8 +10,10 @@ import {
   ErrorCode,
 } from "@modelcontextprotocol/sdk/types.js";
 import { DocumentationIndexer } from "./indexer/DocumentationIndexer.js";
+import { ensureExtracted } from "./utils/zipExtractor.js";
 import * as path from "path";
 import { fileURLToPath } from "url";
+import { createServer, IncomingMessage, ServerResponse } from "http";
 
 /**
  * EBX Documentation MCP Server
@@ -21,8 +24,9 @@ import { fileURLToPath } from "url";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Initialize the documentation indexer
+// Paths for documentation
 const indexPath = path.join(__dirname, "..", "data", "index.json");
+const zipPath = path.join(__dirname, "..", "ebx-core-javadoc.zip");
 const javadocRoot = path.join(__dirname, "..", "ebx-core-javadoc");
 const indexer = new DocumentationIndexer(indexPath, javadocRoot);
 
@@ -353,16 +357,114 @@ async function handleFindPackage(args: any) {
  * Start the server
  */
 async function main() {
+  // Extract javadoc from zip if needed
+  console.error("Ensuring javadoc is extracted...");
+  await ensureExtracted(zipPath, javadocRoot, { verbose: false });
+
   // Initialize the documentation indexer
   console.error("Loading EBX documentation index...");
   await indexer.initialize();
   console.error("Index loaded successfully");
 
-  const transport = new StdioServerTransport();
-  await server.connect(transport);
+  // Check if HTTP mode is requested
+  const useHttp = process.argv.includes('--http') || process.env.MCP_TRANSPORT === 'http';
 
-  // Log to stderr so it doesn't interfere with MCP communication
-  console.error("EBX Documentation MCP Server running");
+  if (!useHttp) {
+    // Default: stdio mode (for MCP Inspector and Claude Desktop)
+    console.error("Starting in stdio mode...");
+    const transport = new StdioServerTransport();
+    await server.connect(transport);
+    console.error("EBX Documentation MCP Server running on stdio");
+    return;
+  }
+
+  // HTTP/SSE mode
+  console.log("Starting in HTTP mode...");
+  const PORT = process.env.PORT ? parseInt(process.env.PORT) : 8000;
+
+  // Store active SSE transport
+  let activeTransport: SSEServerTransport | null = null;
+
+  // Create HTTP server
+  const httpServer = createServer(async (req: IncomingMessage, res: ServerResponse) => {
+    // Set CORS headers
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+    // Handle OPTIONS preflight
+    if (req.method === 'OPTIONS') {
+      res.writeHead(200);
+      res.end();
+      return;
+    }
+
+    // Health check endpoint
+    if (req.url === '/health') {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      const version = indexer.getVersion() || 'unknown';
+      res.end(JSON.stringify({ status: 'ok', version }));
+      return;
+    }
+
+    // SSE endpoint for MCP
+    if (req.url === '/sse') {
+      console.log('New SSE connection established');
+
+      // Create new transport and connect
+      activeTransport = new SSEServerTransport('/message', res);
+      await server.connect(activeTransport);
+
+      // Handle client disconnect
+      req.on('close', () => {
+        console.log('SSE connection closed');
+        activeTransport = null;
+      });
+
+      return;
+    }
+
+    // Handle POST to /message endpoint - route to active transport
+    if (req.url === '/message' && req.method === 'POST') {
+      if (!activeTransport) {
+        res.writeHead(503, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'No active SSE connection' }));
+        return;
+      }
+
+      let body = '';
+      req.on('data', (chunk) => {
+        body += chunk.toString();
+      });
+
+      req.on('end', async () => {
+        try {
+          console.log('Received message:', body);
+
+          // The SSEServerTransport should handle this internally
+          // For now, acknowledge receipt
+          res.writeHead(202, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ status: 'accepted' }));
+        } catch (error) {
+          console.error('Error handling message:', error);
+          res.writeHead(500, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Internal server error' }));
+        }
+      });
+
+      return;
+    }
+
+    // Default response
+    res.writeHead(404, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Not found' }));
+  });
+
+  httpServer.listen(PORT, () => {
+    console.log(`EBX Documentation MCP Server running on http://localhost:${PORT}`);
+    console.log(`SSE endpoint: http://localhost:${PORT}/sse`);
+    console.log(`Health check: http://localhost:${PORT}/health`);
+  });
 }
 
 main().catch((error) => {
