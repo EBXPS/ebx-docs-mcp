@@ -16,7 +16,7 @@ A Model Context Protocol (MCP) server that makes TIBCO EBX v6.2.2 javadocs acces
 
 - Node.js 18+
 - npm or yarn
-- TIBCO EBX v6.2.2 javadoc HTML files (should be in `ebx-core-javadoc/` directory)
+- TIBCO EBX v6.2.2 javadoc HTML files in zip form (in `javadoc/` directory)
 
 ### Setup
 
